@@ -29,12 +29,95 @@
         o plano free. Seus dados de cartão de crédito não serão solicitados.
 */
 
-const API = "https://v6.exchangerate-api.com/v6/8ff9fc0d9cc87551a5790385/latest/USD"
-
+const currenciesOneContainer = document.querySelector('[data-js="currencies-container"]');
 const currencyOneEl = document.querySelector('[data-js="currency-one"]');
 const currencyTwoEl = document.querySelector('[data-js="currency-two"]');
+const currencyTimesOneEl = document.querySelector('[data-js="currency-one-times"]');
+const convertedValueEl = document.querySelector('[data-js="converted-value"]');
+const conversionPrecisionEl = document.querySelector('[data-js="conversion-precision"]');
 
-const option = `<option>Dolar<option>`
-currencyOneEl.innerHTML = option;
+let internalExchangeRate = {}
 
-// const currencyInput = document.querySelector('[data-js="currency-one-times"]');
+const getUrl = (currency) => `https://v6.exchangerate-api.com/v6/8ff9fc0d9cc87551a5790385/latest/${currency}`;
+
+const getErrorMessage = (errorType) => ({
+    'unsupported-code': 'Moeda não suportada',
+    'malformed-request': 'Requisição mal formada',
+    'invalid-key': 'A chave de acesso é inválida.',
+    'inactive-account': 'Sua conta está inativa.',
+    'quota-reached': 'Sua conta atingiu o limite de requisições.',
+})[errorType] || 'Ocorreu um erro no servidor.';
+
+
+const showAlert = (error) => {
+    const div = document.createElement('div');
+    div.textContent = error.message
+    div.classList.add('alert', 'alert-warning', 'alert-dismissible', 'fade', 'show');
+    div.setAttribute('role', 'alert');
+
+    const button = document.createElement('button');
+    button.classList.add('btn-close');
+    button.setAttribute('type', 'button');
+    button.setAttribute('data-dismiss', 'alert');
+    button.setAttribute('aria-label', 'close');
+    button.addEventListener('click', () => div.remove());
+
+    div.appendChild(button)
+    currenciesOneContainer.insertAdjacentElement('afterend', div);
+}
+
+
+async function fetchExchangeRate(currency) {
+    try {
+        const response = await fetch(getUrl(currency));
+        if (!response.ok) 
+            throw new Error("Erro de Conexão com a internet");
+        data = await response.json();
+        if (data.result == 'error') 
+            throw new Error(getErrorMessage(data['error-type']));
+        return data;
+    }
+    catch (error) {
+        showAlert(error);
+    }
+}
+
+const showInitialInfo = () => {
+    const getOptions = selectedCurrency => Object.keys(internalExchangeRate.conversion_rates)
+    .map(currency => `<option ${currency == selectedCurrency ? 'selected' : ''}>${currency}</option>`)
+    .join('');
+
+    currencyOneEl.innerHTML = getOptions('USD');
+    currencyTwoEl.innerHTML = getOptions('BRL');
+
+    convertedValueEl.textContent = internalExchangeRate.conversion_rates.BRL.toFixed(2);
+    conversionPrecisionEl.textContent = `1 USD = ${internalExchangeRate.conversion_rates.BRL} BRL`;
+};
+
+const init = async () => {
+    internalExchangeRate = {...(await fetchExchangeRate('USASD')) };
+
+    if(internalExchangeRate.conversion_rates) {
+        showInitialInfo();
+    }
+}
+
+
+currencyOneEl.addEventListener('input', async (el) => {
+    internalExchangeRate = {...(await fetchExchangeRate(el.target.value)) };
+    convertedValueEl.textContent = (currencyTimesOneEl.value * internalExchangeRate.conversion_rates[currencyTwoEl.value]).toFixed(2);
+    conversionPrecisionEl.textContent = `1 ${currencyOneEl.value} = ${1 * internalExchangeRate.conversion_rates[currencyTwoEl.value]} ${currencyTwoEl.value}`;
+});
+
+currencyTwoEl.addEventListener('input', (el) => {
+    const currencyTwoValue = internalExchangeRate.conversion_rates[el.target.value];
+    convertedValueEl.textContent = (currencyTimesOneEl.value * currencyTwoValue).toFixed(2);
+    conversionPrecisionEl.textContent = `1 ${currencyOneEl.value} = ${1 * internalExchangeRate.conversion_rates[currencyTwoEl.value]} ${currencyTwoEl.value}`;
+});
+
+currencyTimesOneEl.addEventListener('input', (el) => {
+    convertedValueEl.textContent = (el.target.value * internalExchangeRate.conversion_rates[currencyTwoEl.value]).toFixed(2);
+});
+
+
+init();
