@@ -81,7 +81,8 @@ const state = (() => {
  * @param {string} currency 
  * @returns {string}
  */
-const getUrl = (currency) => `https://v6.exchangerate-api.com/v6/8ff9fc0d9cc87551a5790385/latest/${currency}`;
+const getUrl = (currency) => `https://v6.exchangerate-api.com/v6/${apiKey}/latest/${currency}`;
+const apiKey = '8ff9fc0d9cc87551a5790385';
 
 /**
  * Retorna a mensagem de erro correspondente ao tipo de erro
