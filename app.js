@@ -28,7 +28,7 @@
       - Para obter a key e fazer requests, você terá que fazer login e escolher
         o plano free. Seus dados de cartão de crédito não serão solicitados.
 */
-
+/* Html Elements */
 const currenciesOneContainer = document.querySelector('[data-js="currencies-container"]');
 const currencyOneEl = document.querySelector('[data-js="currency-one"]');
 const currencyTwoEl = document.querySelector('[data-js="currency-two"]');
@@ -37,6 +37,10 @@ const convertedValueEl = document.querySelector('[data-js="converted-value"]');
 const conversionPrecisionEl = document.querySelector('[data-js="conversion-precision"]');
 
 
+/**
+ * Mostra um alerta de erro
+ * @param {string} message
+ */
 const showAlert = (message) => {
     const div = document.createElement('div');
     div.textContent = message
@@ -54,7 +58,9 @@ const showAlert = (message) => {
     currenciesOneContainer.insertAdjacentElement('afterend', div);
 }
 
-
+/**
+ * Atualiza o valor da conversão
+ */
 const state = (() => {
     let exchangeRate = {}
     return {
@@ -70,9 +76,18 @@ const state = (() => {
     }
 })()
 
-
+/**
+ * Concatena a url da chamada da api com a moeda
+ * @param {string} currency 
+ * @returns {string}
+ */
 const getUrl = (currency) => `https://v6.exchangerate-api.com/v6/8ff9fc0d9cc87551a5790385/latest/${currency}`;
 
+/**
+ * Retorna a mensagem de erro correspondente ao tipo de erro
+ * @param {string} errorType 
+ * @returns {string}
+ */
 const getErrorMessage = (errorType) => ({
     'unsupported-code': 'Moeda não suportada',
     'malformed-request': 'Requisição mal formada',
@@ -81,62 +96,93 @@ const getErrorMessage = (errorType) => ({
     'quota-reached': 'Sua conta atingiu o limite de requisições.',
 })[errorType] || 'Ocorreu um erro no servidor.';
 
-
-
-
-
+/**
+ * Faz a requisição para obter os valores de conversão e trata possíveis erros
+ * @param {string} currency 
+ * @returns 
+ */
 async function fetchExchangeRate(currency) {
     try {
         const response = await fetch(getUrl(currency));
+
         if (!response.ok) 
             throw new Error("Erro de Conexão com a internet");
+
         data = await response.json();
+
         if (data.result == 'error') 
             throw new Error(getErrorMessage(data['error-type']));
-        return data;
+
+        return state.setExchangeRate(data);
     }
     catch (error) {
         showAlert(error.message);
     }
 }
 
-const showInitialInfo = (exchangeRate) => {
-    const getOptions = selectedCurrency => Object.keys(exchangeRate.conversion_rates)
-    .map(currency => `<option ${currency == selectedCurrency ? 'selected' : ''}>${currency}</option>`)
-    .join('');
-
-    currencyOneEl.innerHTML = getOptions('USD');
-    currencyTwoEl.innerHTML = getOptions('BRL');
-
-    convertedValueEl.textContent = exchangeRate.conversion_rates.BRL.toFixed(2);
-    conversionPrecisionEl.textContent = `1 USD = ${exchangeRate.conversion_rates.BRL} BRL`;
-};
-
-const showUpdatedRates = (exchangeRate) => {
-    convertedValueEl.textContent = (currencyTimesOneEl.value * exchangeRate.conversion_rates[currencyTwoEl.value]).toFixed(2);
-    conversionPrecisionEl.textContent = `1 ${currencyOneEl.value} = ${1 * exchangeRate.conversion_rates[currencyTwoEl.value]} ${currencyTwoEl.value}`;
+/**
+ * Cria uma lista de elementos <option> para um select
+ * @param {object} selectedCurrency 
+ * @returns {string}
+ */
+const getOptions = (selectedCurrency, conversion_rates) => {
+    const selectedAttribute = currency => (currency == selectedCurrency) ? 'selected' : '';
+    return Object.keys(conversion_rates)
+        .map(currency => `<option ${selectedAttribute(currency)}>${currency}</option>`)
+        .join('');
 }
 
+/**
+ * Monta o Select para mostrar as moedas disponíveis
+ * @param {object} param
+ */
+const showInitialInfo = ({ conversion_rates }) => {
+    currencyOneEl.innerHTML = getOptions('USD', conversion_rates);
+    currencyTwoEl.innerHTML = getOptions('BRL', conversion_rates);
+    convertedValueEl.textContent = conversion_rates.BRL.toFixed(2);
+    conversionPrecisionEl.textContent = `1 USD = ${conversion_rates.BRL} BRL`;
+};
+
+/**
+ * Atualiza o valor textual dos elementos do DOM
+ * @param {object} param
+ */
+const showUpdatedRates = ({ conversion_rates }) => {
+    convertedValueEl.textContent = (currencyTimesOneEl.value * conversion_rates[currencyTwoEl.value]).toFixed(2);
+    conversionPrecisionEl.textContent = `1 ${currencyOneEl.value} = ${1 * conversion_rates[currencyTwoEl.value]} ${currencyTwoEl.value}`;
+}
+
+/**
+ * Função que é executada na incialização do script
+ */
 const init = async () => {
-    const exchangeRate = state.setExchangeRate(await fetchExchangeRate('USD'));
+    const exchangeRate = await fetchExchangeRate('USD');
     if(exchangeRate && exchangeRate.conversion_rates) {
         showInitialInfo(exchangeRate);
     }
 }
 
+/**
+ * Função que é executada quando ocorre um evento de mudança no primeiro select
+ */
 currencyOneEl.addEventListener('input', async (el) => {
-    const exchangeRate = state.setExchangeRate(await fetchExchangeRate(el.target.value));
-    console.log(exchangeRate);
+    const exchangeRate = await fetchExchangeRate(el.target.value);
     showUpdatedRates(exchangeRate);
 });
 
+/**
+ * Função que é executada quando ocorre um evento de mudança no segundo select
+ */
 currencyTwoEl.addEventListener('input', (el) => {
     showUpdatedRates(state.getExchangeRate());
 });
 
+/**
+ * Função que é executada quando ocorre um evento de mudança no input de valores
+ */
 currencyTimesOneEl.addEventListener('input', (el) => {
-    const exchangeRate = state.getExchangeRate();
-    convertedValueEl.textContent = (el.target.value * exchangeRate.conversion_rates[currencyTwoEl.value]).toFixed(2);
+    const { conversion_rates } = state.getExchangeRate();
+    convertedValueEl.textContent = (el.target.value * conversion_rates[currencyTwoEl.value]).toFixed(2);
 });
 
 
